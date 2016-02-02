@@ -20,6 +20,9 @@ typedef unsigned short uint16_t;
 
 #define COM1 ((uint16_t)0x3f8)
 #define COM2 ((uint16_t)0x2f8)
+#define screenWidth 80
+#define rows 25
+#define column 80
 
 static __inline __attribute__((always_inline, no_instrument_function))
 uint8_t inb(uint16_t port) {
@@ -92,12 +95,12 @@ void write_string( int colour, const char *string ) {
     
     while( *string != 0 ) {
         if(*string=='\n'){
-          // video = video + 2*80;
-       } 
-      //  video = video + 2 * (y * 80 + x);
+           video += screenWidth*2 - ((int)(video-0xB8000) % (screenWidth*2));
+           *string++;
+       } else{
         *video++ = *string++;
         *video++ = colour;
-            
+        }
         //x++;
        // y++;    
     
@@ -128,6 +131,9 @@ void kmain(void) {
       c = '\n';
       serial_write_char(COM1,c);
       serial_write_char(COM1,'>');
+      s[0] = c;
+      s[1] = 0;
+      write_string(0x2a, s);
     } else {
       serial_write_char(COM1,c);
       s[0] = c;
