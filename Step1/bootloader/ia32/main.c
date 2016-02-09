@@ -23,6 +23,8 @@ typedef unsigned short uint16_t;
 #define screenWidth 80
 #define rows 25
 #define column 80
+#define coinBasDroite 0xB8000+(screenWidth*2)*2
+
 
 static __inline __attribute__((always_inline, no_instrument_function))
 uint8_t inb(uint16_t port) {
@@ -89,32 +91,70 @@ char serial_read(uint16_t port) {
  *   http://wiki.osdev.org/VGA_Resources
  */
  //volatile char *video = (volatile char*)0xB8000;
-  char *video = (char *)0xB8000;
-  int x=1 , y=1;  
-void write_string( int colour, const char *string ) {
+ 
+ char *video = (char *)0xB8000;
+ 
+ void write_string( int colour, const char *string ) {
     
     while( *string != 0 ) {
         if(*string=='\n'){
            video += screenWidth*2 - ((int)(video-0xB8000) % (screenWidth*2));
            *string++;
        } else{
-        *video++ = *string++;
-        *video++ = colour;
-        }
-        //x++;
-       // y++;    
-    
+          *video++ = *string++;
+          *video++ = colour;
+        }    
     }
 }
+
+#define coinBasDroite 0xB8000 + 2*column*2
+void scroll(){
+
+    char *tmp;
+    for(tmp=(char *)0xB8000;tmp< 0xB8000 + 2*column;tmp++){
+        *tmp=*(tmp+2*column);
+    }
+    video=video-2*column;
+
+}
+
+
+void flecheGauche(){
+    if(video !=(char*)0xB8000 )
+    video -= 2;
+}
+
+
+void flecheDroite(){
+    if(video != coinBasDroite)
+        video += 2;
+
+}
+
+
+void flecheHaut(){
+    if(video > 0xB8000 + 2*column)
+      video-=2*screenWidth;
+    
+}
+
+#define ligne 3
+void flecheBas(){
+    if(video < 0xB8000 + 2*column*(ligne-1))
+       video+=2*screenWidth;
+      
+  }
+
 
 int i=0;
 void kputchar(int c, void *arg) {
   serial_write_char(COM2,c);
 }
 
+
 void kmain(void) {
 
-  write_string(0x2a,"Console greetings!");
+  //write_string(0x2a,"Console greetings!");
 
   serial_init(COM1);
   serial_write_string(COM1,"\n\rHello!\n\r\nThis is a simple echo console... please type something.\n\r");
@@ -123,23 +163,53 @@ void kmain(void) {
   
   char s[2];
   while(1) {
-    unsigned char c;
+    /*unsigned*/ char c;
     c=serial_read(COM1);
-    if (c==13) {
-      c = '\r';
-      serial_write_char(COM1,c);
-      c = '\n';
-      serial_write_char(COM1,c);
-      serial_write_char(COM1,'>');
-      s[0] = c;
-      s[1] = 0;
-      write_string(0x2a, s);
-    } else {
-      serial_write_char(COM1,c);
-      s[0] = c;
-      s[1] = 0;
-      write_string(0x2a, s);
-    }
-}
+      switch(c){    
+          case 13: // touche entrée
+              c = '\r';
+              serial_write_char(COM1,c);
+              c = '\n';
+              serial_write_char(COM1,c);
+              serial_write_char(COM1,'>');
+              s[0] = c;
+              s[1] = 0;
+              write_string(0x2a, s);
+              break;
+          case '\033': //entrée fleche de direction
+                c = serial_read(COM1);
+                
+               // if(c=='['){
+                    c = serial_read(COM1); // Je refais un read pour evacuer le '['
+                    
+                    if(c=='D')  // fleche gauche
+                        //video-=2;
+                        flecheGauche();
+                    if(c=='C')   //67 fleche droite
+                        //video+=2;
+                        flecheDroite();
+                    if(c=='B')  //65 fleche bas
+                        //video+=2*screenWidth;
+                         flecheBas(); 
+                    if(c=='A')  //66 fleche haut
+                        //video-=2*screenWidth;
+                        flecheHaut();
+
+                        
+                 
+                break;   
+            case 127:
+                video= video -2;//flecheGauche();
+                break;
+          default:
+            if(video == coinBasDroite)
+                scroll(video);
+                
+              serial_write_char(COM1,c);
+              s[0] = c;
+              s[1] = 0;
+              write_string(0x2a, s); 
+            }
+     }
 
 }
